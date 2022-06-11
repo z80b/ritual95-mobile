@@ -4,4 +4,5 @@ npm-debug.log
 dist
 package-lock.json
 pnpm-lock.yaml
-stats.html
+public/assets/*.css
+public/assets/*.js

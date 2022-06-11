@@ -1,12 +1,15 @@
 <template>
   <div class="app">
-    <PageHello />
+    <main-page/>
   </div>
 </template>
 
-<script setup>
-import PageHello from '@/components/pages/PageHello.vue'
-</script>
+<script>
+import MainPage from '@/components/pages/main-page.vue'
 
-<style scoped>
-</style>
+export default {
+  components: {
+    MainPage,
+  },
+};
+</script>
