@@ -277,7 +277,7 @@ function randomize_on_main() {
         /*
 					<div class="element_price">Цена: ';
 					if ($node->product_minprice && $node->product_minprice > 0)
-					    $output .= 'от '.intval($node->product_minprice).' Руб.';
+            $output .= 'от '.intval($node->product_minprice).' Руб.';
 					$output .= '</div>        
         */
     }
