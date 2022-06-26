@@ -1,32 +1,27 @@
-start: stop mysql php nginx
-
-stop:
-	docker stop $(notdir $(CURDIR))_nginx || true
-	#docker rm --force $(notdir $(CURDIR))_nginx || true
-	docker stop $(notdir $(CURDIR))_php || true
-	#docker rm --force $(notdir $(CURDIR))_php || true
-	docker stop $(notdir $(CURDIR))_mysql || true
-	#docker rm --force $(notdir $(CURDIR))_mysql || true
+net:
+	docker network create $(notdir $(CURDIR))_network
 
 mysql:
 	docker run -d --rm --name $(notdir $(CURDIR))_mysql \
-	-v $(CURDIR)/.docker/db:/var/lib/mysql \
-	-v $(CURDIR)/.docker/mysql.cnf:/etc/mysql/my.cnf \
+	--network $(notdir $(CURDIR))_network \
+	--hostname $(notdir $(CURDIR))_mysql \
+	--volume $(CURDIR)/.docker/db:/var/lib/mysql \
+	--volume $(CURDIR)/.docker/mysql.cnf:/etc/mysql/my.cnf \
 	-e MYSQL_ROOT_PASSWORD=12345 \
 	devilbox/mysql:mysql-5.5
 
 php:
 	docker run -d --rm --name $(notdir $(CURDIR))_php \
-	-v $(CURDIR):/var/www/default/htdocs \
-	--link $(notdir $(CURDIR))_mysql:db \
+	--network $(notdir $(CURDIR))_network \
+	--volume $(CURDIR):/var/www/default/htdocs \
 	devilbox/php-fpm-5.2
 
 nginx:
 	docker run -d --rm --name $(notdir $(CURDIR))_nginx \
-	-v $(CURDIR):/var/www/default/htdocs \
-	-v $(CURDIR)/.docker/nginx.conf:/etc/httpd/conf.d/localhost.conf \
+	--network $(notdir $(CURDIR))_network \
+	--volume $(CURDIR):/var/www/default/htdocs \
+	--volume $(CURDIR)/.docker/nginx/drupal6.conf:/etc/httpd/vhost.d/drupal6.conf \
 	-e PHP_FPM_ENABLE=1 \
 	-e PHP_FPM_SERVER_ADDR=$(notdir $(CURDIR))_php \
-	-p 3000:80 \
-	--link $(notdir $(CURDIR))_php \
+	-p 5555:80 \
 	devilbox/nginx-stable
