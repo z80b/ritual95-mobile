@@ -1,0 +1,30 @@
+; $Id: Ritual95_2015.info,v 1.0 2012/05/19 14:06:32 Stitch Exp $
+name = Ritual95_2015
+description = Тема сайта РИТУАЛ 95 2015
+version = VERSION
+screenshot = screenshot.jpg
+core = 6.x
+engine = phptemplate
+
+regions[header] = Шапка сайта
+regions[sidebar] = Левая колонка и меню
+regions[center] = Центральный блок
+regions[index_top] = Блоки главной страницы - Верхняя часть
+regions[index_bottom] = Блоки главной страницы - Нижняя часть
+
+
+regions[left] = Левая колонка
+regions[right] = Правая колонка
+regions[menu] = Регион для меню
+regions[top_content] = Содержимое сразу под заголовком
+regions[content] = Основной контент
+
+features[] = logo
+features[] = favicon
+
+stylesheets[all][] = style.css
+
+
+version = "6.26"
+project = "Ritual95_2015"
+datestamp = "1292447788"

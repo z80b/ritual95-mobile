@@ -1,0 +1,176 @@
+<?php //$Id: product_buy.module,v 1.0 2014/05/05 16:42:00 Stitch Exp $
+//die('<pre>'.print_r($GLOBALS['conf'], true).'</pre>');
+function product_buy_menu() {
+    return array (
+        'ajax/product/buy/%' => array (
+            'page callback' => 'product_buy_get_form',
+            'page arguments' => array(3),
+            'access arguments' => array('access content'),
+            'type' => MENU_CALLBACK,
+        ),
+        'ajax/product/buy/%/submit' => array (
+            'page callback' => 'product_buy_submit_form',
+            'page arguments' => array(3),
+            'access arguments' => array('access content'),
+            'type' => MENU_CALLBACK,
+        ),
+    );
+}
+
+function product_buy_submit_form() {
+    //drupal_set_header('Content-type: text/json; charset=utf-8');
+    $result = array();
+    if (isset($_REQUEST['user_name']) && isset($_REQUEST['user_phone'])) {
+        if ($mail_status = product_send_order_mail($_REQUEST)) {
+            $result = array (
+                'status'  => 'ok',
+                'message' => 'Ваш заказ был отправлен на почтовый ящик нашего менеджера. В ближайшее время он(а) с вами свяжется.',
+            );
+        } else $result = array(
+            'status'  => 'error',
+            'message' => 'Не удалось отправить сведения о заказе на почтовый ящик.',
+        );
+    } else {
+        $result['status'] = 'error';
+        if (!isset($_REQUEST['user_name'])) {
+            $result['message']['user_name'] = 'Поле <b>Ф.И.О.</b> не заполнено';
+        }
+        if (!isset($_REQUEST['user_phone'])) {
+            $result['message']['user_phone'] = 'Поле <b>Телефон</b> не заполнено';
+        }
+    }
+    drupal_json($result);
+    die();
+    //die('<pre>'. print_r($_POST, true) .'</pre>');
+}
+
+function product_send_order_mail($params) {
+    global $conf;
+    $mail = drupal_mail('product_buy', 'order', $conf['site_mail'], 'ru', $params, $conf['smtp_from'], true);
+    return (isset($mail['result']) && $mail['result'] == 1) ? true : false;
+    //die('<pre>'. print_r($mail, true) .'</pre>');
+}
+
+function product_buy_mail($key, &$message, $params) {
+    switch ($key) {
+        case 'order':
+            $user = new stdClass();
+            $user->name = $params['user_name'];
+            $user->phone = $params['user_phone'];
+            $user->message = $params['user_msg'];
+            $product = db_fetch_object(db_query("SELECT * FROM {product} WHERE `pid`=%d", $params['pid']));
+            $product_node = node_load($product->nid);
+            $product->title = $product_node->title;
+            $product->body = $product_node->body;
+            $message['subject'] = 'Заказ'; 
+            $message['body'] = theme('product_buy_order_mail_body', $product, $user);
+            $message['headers']['Content-Type'] = 'text/html; charset=UTF-8; format=flowed';
+            break;
+    }
+}
+
+function product_buy_nodeapi(&$node, $op, $teaser = false, $page = NULL) {
+    if ($node->type == 'product' && $op == 'view' && !$teaser) {
+        //die('<pre>'. print_r($node, true) .'</pre>');
+        drupal_add_js(drupal_get_path('module', 'product_buy') . '/product_buy.js');
+    }
+}
+
+function product_buy_get_form($pid = NULL) {
+    if (!$pid) return array();
+    $price = db_fetch_object(db_query("SELECT * FROM {product} WHERE `pid`=%d LIMIT 1", $pid));
+    $product_node = node_load($price->nid);
+    //die('<pre>'. print_r($product_node, true) .'</pre>');
+    $form = product_buy_order_form($product_node, $price);
+    $output = drupal_render($form);
+    die($output);
+}
+
+function product_buy_order_form($product_node, $price) {
+    return array (
+        'order_form' => array (
+            '#type' => 'fieldset',
+            '#attributes' => array (
+                'class' => 'product-order-form',
+            ),
+            'price_id' => array (
+                '#name'  => 'pid',
+                '#type'  => 'hidden',
+                '#value' => $price->pid,
+            ),
+            'product_title' => array (
+                '#prefix' => '<h1>',
+                '#suffix' => '</h1>',
+                '#value' => $product_node->title,
+                '#weight' => 0,
+            ),
+            'product_thumb' => array (
+                '#value' => $product_node->product_thumb,
+            ),
+            'desc_block' => array (
+                '#prefix' => '<div class="product-desc-block">',
+                '#suffix' => '</div>',
+                'product_desc' => array (
+                    '#prefix' => '<p>',
+                    '#suffix' => '</p>',
+                    '#value' => $product_node->body,
+                    '#weight' => 1,
+                ),
+                'product_price_desc' => array (
+                    '#prefix' => '<p>',
+                    '#suffix' => '</p>',
+                    '#value' => $price->description,
+                    '#weight' => 2,
+                ),
+                'product_price' => array (
+                    '#prefix' => '<h2>',
+                    '#suffix' => ' руб.</h2>',
+                    '#value' => $price->price,
+                    '#weight' => 3,
+                ),
+                'cleaner' => array (
+                    '#value' => '<div class="clear"></div>',
+                    '#weight' => 4,
+                ),
+            ),
+            'user_name' => array (
+                '#name' => 'user_name',
+                '#type' => 'textfield',
+                '#title' => 'Ф.И.О. заказчика',
+                '#required' => true,
+                '#weight' => 4,
+            ),
+            'user_phone' => array (
+                '#name' => 'user_phone',
+                '#type' => 'textfield',
+                '#title' => 'Телефон для связи',
+                '#required' => true,
+                '#weight' => 5,
+            ),
+            'order_desc' => array (
+                '#name' => 'user_msg',
+                '#title' => 'Примечания к заказу',
+                '#type' => 'textarea',
+                '#weight' => 6,
+            ),
+            'separaror' => array (
+                '#value' => '<hr />',
+                '#weight' => 7,
+            ),
+            'form_submit' => array (
+                '#type' => 'submit',
+                '#value' => 'Заказать',
+                '#weight' => 8,
+            )
+        ),
+    );
+}
+
+function product_buy_theme() {
+    return array (
+        'product_buy_order_mail_body' => array (
+            'template' => 'order-mail-body',
+            'arguments' => array ('product' => NULL, 'custumer' => NULL),
+        )
+    );
+}

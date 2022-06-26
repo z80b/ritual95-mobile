@@ -1,0 +1,11 @@
+; $Id: zakaz.info,v 1.0 2011/04/19 18:20:21 z80b Exp $
+name = Zakaz
+description = Zakaz form for Ritual95
+package = Ritual95
+version = VERSION
+core = 6.x
+
+; Information added by drupal.org packaging script on 2010-06-02
+version = "6.20"
+project = "drupal"
+datestamp = "1275505216"

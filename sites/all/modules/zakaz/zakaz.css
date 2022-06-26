@@ -1,0 +1,8 @@
+#zakaz-form .clear, .form-item { clear: both }
+#zakaz-form .form-radios .form-item { float: left; clear: none }
+#zakaz-form .form-radios,
+#zakaz-form .form-item label,
+#zakaz-form .form-item .description,
+#zakaz-form .form-submit { clear: both }
+#zakaz-form fieldset { padding: 4px 4px 24px }
+#zakaz-form select { width: 100% }

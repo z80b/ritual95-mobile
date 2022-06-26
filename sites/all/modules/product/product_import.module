@@ -1,0 +1,169 @@
+<?php //$Id: product_import.module,v 1.0 2012/05/25 12:08:21 Stitch Exp $
+
+function product_import_menu() {
+    return array (
+        'admin/content/product_import' => array (
+            'title' => 'Импорт товара из xml',
+            'description' => '',
+            'page callback' => 'drupal_get_form',
+            'page arguments' => array('product_import_form'),
+            'access arguments' => array('access content'),
+            'type' => MENU_NORMAL_ITEM,            
+        ),
+    );
+}
+
+function product_import_form() {
+    return array (
+         '#attributes' => array (
+            'enctype' => 'multipart/form-data',
+         ),
+        '#submit' => array ('product_import_form_submit'),
+        'product_import_fieldset' => array (
+            '#type' => 'fieldset',
+            '#title' => 'Форма импорта',
+            'import_file' => array (
+                '#title' => 'Выбрать файл xml',
+                '#type' => 'file',
+            ),
+            'import_start' => array (
+                '#type' => 'submit',
+                '#value' => 'Начать импорт',
+            ),
+        ),
+    );
+}
+
+function product_import_form_submit(&$form, &$form_state) {
+    global $user;
+   
+    //die('<pre>'.print_r($files, true).'</pre>');    
+    $groups = array (
+        'granite'    => 1,
+        'polimer'    => 2,
+        'mramor'     => 3,
+        'decoration' => 4,
+        'complex'    => 5,
+        'cgranite'   => 6,
+    );
+    
+    $limits = _upload_file_limits($user);
+    $validators = array(
+        'file_validate_extensions' => array($limits['extensions']), 
+        'file_validate_image_resolution' => array($limits['resolution']), 
+        'file_validate_size' => array($limits['file_size'], $limits['user_size']),
+    );
+
+    // Save new file uploads.
+    
+    if ($file = file_save_upload('import_file', $validators, file_directory_path())) {
+        $file->list = variable_get('upload_list_default', 1);
+        $file->description = $file->filename;
+        $file->weight = 0;
+        $file->new = TRUE;
+        $form['#node']->files[$file->fid] = $file;
+        $form_state['values']['files'][$file->fid] = (array) $file;
+    }
+    
+    $xml = simplexml_load_file($file->filepath);
+    if(!$xml) return FALSE;
+    
+    $result = array();
+    
+    foreach ($xml->image as $item) {
+        
+        $attr = $item->attributes();
+        if ((string)$attr->group != 'mramor') continue;
+        
+        $product = new stdClass();
+        
+        $term = taxonomy_get_term($groups[(string)$attr->group]);
+        $product->taxonomy[$term->tid] = $term;
+        
+        $product->title = (string)$item->title;
+        $product->type  = 'product';
+        $product->language = 'ru';
+        $product->uid = $user->uid;
+        $product->status = 1;
+        $product->promote = 1;
+        $product->body = (string)$item->description;
+        $product->description = (string)$item->description;
+        $product->created = time();
+        $product->changed = time();
+        
+        node_save($product);
+        
+        if ($product->nid) {
+            product_import_save_image($product, (string)$attr->group . '_' . (string)$attr->src);
+            
+            $prices = $item->xpath('costs/cost');
+            foreach($prices as $price) {
+                $price_attr = $price->attributes();
+                product_import_save_price($product, (string)$price, (string)$price_attr->size, (string)$price_attr->value);
+            }
+        }
+        
+        //die('<pre>'.print_r($product, true).'</pre>');
+    }
+
+}
+
+function product_import_save_image(&$node, $path_source = '') {
+    
+    // Занесение картинки в
+    $file = new stdClass();  
+    
+    $node->field_image_cache = array();
+    // Обработчик картинки
+    $file->filename = strtolower(preg_replace('~[^a-z_\-\.\d]~i', '', basename($path_source)));
+    $file->filepath = file_create_path().'/'.$file->filename;
+    
+    if(file_exists(file_create_path().'/'.$file->filename)){          
+        $info = image_get_info($file->filepath);
+       
+        if(!isset($info)) return FALSE;
+        $file->filemime = $info['mime_type'];
+        $file->filesize = $info['file_size'];
+        $file->uid = $node->uid;
+        $file->status = 1;
+        $file->timestamp = time();
+        drupal_write_record('files', $file);
+        
+        if ($file->fid) {
+            $upload = new stdClass();
+            $upload->fid = $file->fid;
+            $upload->nid = $node->nid;
+            $upload->vid = $node->vid;
+            $upload->description = $file->filename;
+            $upload->list = 0;
+            $upload->weight = 0;
+            drupal_write_record('upload', $upload);
+        }
+    }
+}
+
+function product_import_save_price(&$node, $body, $teaser, $price) {
+    /*$info = new stdClass();
+    $info->nid = $node->nid;
+    $info->description = $body;
+    $info->teaser = $teaser;
+    $info->price  = $price;*/
+    // drupal_write_record('product', $info);
+    // что бы работало нужно описать таблицу в файле product.install
+    
+    $pid = db_result(db_query(
+        "SELECT COUNT(*) FROM {product} WHERE `nid`=%d AND `description`='%s' AND `price`='%s'",
+        $node->nid, $body, $price
+    ));
+    
+    if (!$pid) {
+        db_query(
+            "INSERT INTO {product} (`nid`,`teaser`,`description`,`price`) VALUES(%d,'%s','%s','%s')",
+            $node->nid, $teaser, $body, $price 
+        );
+    } else db_query(
+        "UPDATE {product} SET `nid`=%d, `teaser`='%s', `description`='%s', `price`='%s' WHERE `pid`=%d",
+        $node->nid, $teaser, $body, $price, $pid
+    );
+    //die('<pre>'.print_r($info, true).'</pre>');
+}

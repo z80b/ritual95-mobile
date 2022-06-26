@@ -1,0 +1,25 @@
+<?php ?>
+<?if ($teaser):?>
+<div class="item-preview">
+    <?php if(user_access('edit any product content')):?>
+        <div class="product-edit-link" href="/node/<?php print $node->nid?>/edit"></div>
+    <?php endif?>
+    <div class="item-content">
+        <a href="<?php print url("node/{$node->nid}")?>" class="item-title"><?php print $node->title?></a>
+        <?php print $node->product_thumb?>
+        <span class="item-price">
+            <?if ($node->product_minprice && $node->product_minprice > 0):?>
+                от <?php print intval($node->product_minprice)?> Руб.
+            <?endif;?>
+        </span>
+    </div>
+</div>
+<?else:?>
+<div id="node-<?php print $node->nid; ?>" class="clear-block product-node<?php if(isset($node->taxonomy[4])) print(' decoration-group')?>">
+    <h1><?print $node->title?></h1>
+    <div class="content clear-block">
+        <?php print $content ?>
+    </div>
+    <div class="clear"></div>
+</div>
+<?endif;?>

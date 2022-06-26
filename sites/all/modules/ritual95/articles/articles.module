@@ -1,0 +1,61 @@
+<?php
+
+function articles_menu() {
+    return array (
+        'articles' => array (
+            'page callback' => 'theme',
+            'page arguments' => array('articles_page'),
+            'access arguments' => array('access content'),
+            'type' => MENU_CALLBACK,
+        ),
+    );
+}
+
+function articles_block($op = 'list', $delta = 0, $edit = array()) {
+    switch ($op) {
+        case 'list':
+            return array (
+                0 => array('info' => 'Блок статей'),
+            );
+            break;
+        case 'view':
+            switch ($delta) {
+                case '0': return array (
+                    'content' => theme('front_page_block'),
+                );
+            }
+            break;
+    }
+}
+
+function articles_theme() {
+    return array (
+        'front_page_block' => array (
+            'template' => 'front-page-block',
+        ),
+        'articles_page' => array (
+            'template' => 'articles-page',
+            'arguments' => array ('data_source' => NULL),
+        ),
+    );
+}
+
+function template_preprocess_front_page_block(&$vars) {
+    $vars['col1'] = $vars['col2'] = '';
+    $rs = db_query("SELECT nid FROM {node} WHERE type='article' AND status AND promote ORDER BY created");
+    $index = 1;
+    while ($nid = db_result($rs)) {
+        $node = node_load($nid);
+        if ($index % 2) $vars['col1'] .= node_view($node, true);
+        else $vars['col2'] .= node_view($node, true);
+        $index++;
+    }
+}
+
+function template_preprocess_articles_page(&$var) {
+    $var['data_source'] = db_query("
+        SELECT * FROM {node} AS `nd`
+        JOIN {node_revisions} AS `nr` ON `nr`.`vid` = `nd`.`vid`
+        WHERE `nd`.`type`='article' AND `nd`.`status` AND `nd`.`promote`
+        ORDER BY `nd`.`created`");
+}

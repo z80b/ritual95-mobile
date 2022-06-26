@@ -1,0 +1,11 @@
+; $Id: articles.info, v 1.0 2013/10/04 15:28:21 Stitch Exp $
+name = Articles
+description = Articles
+package = Ritual95
+version = VERSION
+core = 6.x
+
+; Information added by drupal.org packaging script on 2010-06-02
+version = "6.20"
+project = "drupal"
+datestamp = "1275505216"

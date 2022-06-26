@@ -1,0 +1,11 @@
+; $Id: product-buy.info,v 1.0 2012/05/25 12:06:21 Stitch Exp $
+name = Product Buy
+description = Управляющие елементы для оформления заказа
+package = Ritual95
+version = VERSION
+core = 6.x
+
+; Information added by drupal.org packaging script on 2010-06-02
+version = "6.20"
+project = "drupal"
+datestamp = "1275505216"

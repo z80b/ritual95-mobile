@@ -1,0 +1,17 @@
+<?php
+
+function products_menu() {
+  return array (
+    'p/%' => array (
+      'page callback' => 'products_node_view',
+      'page arguments' => array(1),
+      'access arguments' => array('access content'),
+      'type' => MENU_CALLBACK,        
+    ),
+  );
+}
+
+function products_node_view($pid) {
+  $nid = db_result(db_query("SELECT `nid` FROM {product} WHERE `pid`=%d", $pid));
+  return node_view(node_load($nid));
+}

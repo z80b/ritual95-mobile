@@ -1,0 +1,10 @@
+#product-fieldset table { width: 100% }
+.price-cell { width: 50px }
+.action-cell { width: 50px }
+span.button { border: none !important }
+
+.product-node, .group-page .content  { min-height: 700px }
+.product-image { text-align: center }
+.product-prices { margin: 30px 0; width: 520px }
+
+.group4 .item-content img { background: #000 }

@@ -1,0 +1,464 @@
+<?php //$Id: product.module,v 1.0 2012/05/25 12:08:21 Stitch Exp $
+
+function product_init() {
+    drupal_add_css(drupal_get_path('module', 'product') . '/product.css');
+    drupal_add_css(drupal_get_path('module', 'jquery_ui') . '/jquery.ui/css/smoothness/jquery-ui-1.8.20.custom.css');
+    drupal_add_js(drupal_get_path('module', 'product') . '/jquery.cookie.js');
+    drupal_add_js(drupal_get_path('module', 'product') . '/jquery1.11.3.min.js');
+    drupal_add_js(drupal_get_path('module', 'product') . '/jquery-ui-1.11.2.min.js');
+    drupal_add_js(drupal_get_path('module', 'product') . '/product.js');
+}
+
+function product_menu() {
+    return array (
+        'product/%' => array (
+            'page callback' => 'product_node_view',
+            'page arguments' => array(1),
+            'access arguments' => array('access content'),
+            'type' => MENU_CALLBACK,            
+        ),
+        'group/%' => array (
+            //'page callback' => 'taxonomy_term_page',
+            //'page arguments' => array(1),
+            'page callback' => 'theme',
+            'page arguments' => array('product_group_page', 1),
+            'access arguments' => array('access content'),
+            'type' => MENU_CALLBACK,            
+            'file' => '../../../../modules/taxonomy/taxonomy.pages.inc',
+        ),
+        'ajax/product/add' => array (
+            'title' => 'Content',
+            'page callback' => 'product_add_node_products',
+            'access arguments' => array('access content'),
+            'type' => MENU_CALLBACK,
+        ),
+        'ajax/product/update' => array (
+            'title' => 'Content',
+            'page callback' => 'product_update_data',
+            'access arguments' => array('access content'),
+            'type' => MENU_CALLBACK,
+        ),
+        'ajax/product/del/%' => array (
+            'page callback' => 'product_del_node_products',
+            'page arguments' => array(3),
+            'access arguments' => array('access content'),
+            'type' => MENU_CALLBACK,            
+        ),
+        'ajax/product/view/%' => array (
+            'page callback' => 'product_get_node_products',
+            'page arguments' => array(3),
+            'access arguments' => array('access content'),
+            'type' => MENU_CALLBACK,
+        ),
+        'ajax/product/get/%' => array (
+            'page callback' => 'product_get_by_pid',
+            'page arguments' => array(3),
+            'access arguments' => array('access content'),
+            'type' => MENU_CALLBACK,
+        ),
+        'node/%/get' => array (
+            'page callback' => 'product_get_nodebyid',
+            'page arguments' => array(1),
+            'access arguments' => array('access content'),
+            'type' => MENU_CALLBACK,
+        ),
+    );
+}
+
+function product_get_nodebyid($nid) {
+    $node = node_load($nid);
+    die($node->body);
+}
+
+function product_nodeapi(&$node, $op, $a3 = NULL, $a4 = NULL) {
+    if ($node->type == 'product') switch ($op) {
+        case 'insert':
+        case 'update':
+            db_query("UPDATE {product} SET `nid`=%d WHERE `nid`=0", $node->nid);
+            break;
+        case 'load':
+            $image = db_fetch_object(db_query("
+                SELECT `filename`,`filepath` FROM {files}
+                JOIN {upload} ON {upload}.`nid`=%d
+                WHERE {files}.`fid` = {upload}.`fid`
+                ORDER BY {upload}.`weight`
+                LIMIT 1
+            ", $node->nid));
+            
+            //$node->product_image = '<img src="'. url('sites/default/files/imagecache/ProductPreview/'.$image->filename) .'" />';
+            //$node->product_thumb = '<img src="'. url('sites/default/files/imagecache/ProductThumbnail/'.$image->filename) .'" href="'. url('sites/default/files/imagecache/ProductPreview/'.$image->filename) .'" />';
+            $attrs = array (
+                'href'  => url('sites/default/files/imagecache/ProductPreview/'.$image->filename),
+                'title' => $node->title,
+                'alt'   => $node->title,
+            );
+
+            $node->product_thumb = img('sites/default/files/imagecache/ProductThumbnail/'.$image->filename, $attrs);
+            unset($attrs['href']);
+            $node->product_image = img('sites/default/files/imagecache/ProductPreview/'.$image->filename, $attrs);
+            $node->product_image_url = url('sites/default/files/imagecache/ProductPreview/'.$image->filename);
+            
+            if(file_exists($_SERVER['DOCUMENT_ROOT'].'sites/default/files/imagecache/ProductPreview/'.$image->filename))
+                $node->product_image_alt = url('sites/default/files/imagecache/ProductPreview/'.$image->filename);
+            else
+                $node->product_image_alt = url('sites/default/files/'.$image->filename);
+                // $node->product_image_alt = url('system/files/'.$image->filename);
+            $node->thumbnail_url = imagecache_create_url('ProductThumbnail', $image->filepath);
+            $node->thumbnail = url('sites/default/files/'.$image->filename);
+            $node->image = url('sites/default/files/'.$image->filename);
+            $node->html = $node->body;
+            
+            $costs = '';
+            $node->prices = array();
+            $rs = db_query("SELECT * FROM {product} WHERE `nid`=%d ", $node->nid);
+            $max_price = 0;
+            $min_price = 10000000;
+            while ($row = db_fetch_object($rs)) {
+                $costs .= '<div class="item-cost">';
+                $costs .= '<span class="cost-size">'. $row->teaser .'</span>';
+                if ($max_price < $row->price) $max_price = $row->price;
+                if ($min_price > $row->price) $min_price = $row->price;
+                if ($row->price > 0) {
+                    $costs .= '<span class="cost-value">'. $row->price .' руб.</span>';
+                }
+                $costs .= '</div>';
+                $node->prices[] = $row;
+            }
+            $node->product_prices = $costs;
+            if ($min_price > $max_price) {
+                $min_price = 0;
+            }
+            $node->product_minprice = $min_price;
+            $node->product_maxprice = $max_price;
+
+            //reviews
+            $reviews = db_fetch_object(db_query("SELECT `cid` FROM {comments} WHERE subject='review' AND status=0", $node->nid));
+            $reviews_count = count($reviews);
+            $node->reviews_count = $reviews_count;
+            //
+            
+            break;
+        case 'view':
+            unset($node->content['files']);
+            // $node->content['image'] = array (
+            //     '#value' => '<div class="clear-block product-image">'. $node->product_image .'</div>',
+            //     '#weight' => 1,
+            // );
+            $left = '
+            <div class="element_detail_left">
+                <div class="element_detail_photo">
+                    '/*<a href="'.$node->product_image_url.'" class="fancybox">'/*.$node->product_thumb*///.$node->product_image.'</a>*/'
+                    .'<a href="'.$node->product_image_alt.'" class="fancybox"><img src="'.$node->product_image_alt.'"></a>
+                </div>
+                <div class="element_detail_reviews">
+                    <a href="/reviews">Отзывов: '.$node->reviews_count.'</a> : <a href="/reviewform">Написать отзыв</a>
+                </div>
+            </div>';
+            // $node->content['image'] = array (
+            //     '#value' => $left,
+            //     '#weight' => 1,
+            // );
+
+            $taxonomy = $node->taxonomy;
+            sort($taxonomy);
+            // 2 Полимергранит
+            // 1 Гранит
+            // 6 Цветной гранит
+            // 3 Мрамор
+            $first_taxonomy_id = $taxonomy[0]->tid;
+
+            $right = '
+            <div class="element_detail_right">
+                <div class="element_detail_specs">
+                    <h1 class="element_detail_title">'.$node->title.'</h1>
+                    <div class="element_detail_available">Наличие: <span>Есть в наличии</span></div>
+                    <div class="element_detail_desc">
+                        <!--Комплект:<br>
+                        <ul>
+                            <li>- стела</li>
+                            <li>- постамент 60*20*10</li>
+                            <li>- цветник 60*100</li>
+                            <li>- сечение 8*8</li>
+                        </ul>-->
+                    </div>
+                    <div class="element_detail_fastbuy">
+                        <div class="element_detail_fastbuy_checkbox" id="elementFastbuy"><img src="'.base_path().path_to_theme().'/img/element_fastbuy.png" alt=""></div>
+                        <div class="form_fastbuy_wrapper">
+                            <div class="form_fastbuy_bg"></div>
+                            <div class="form">
+                                <input type="hidden" name="taxonomy_id" value="'.$first_taxonomy_id.'">
+                                <div class="form_triangle"></div>
+                                <div class="form_close"></div>
+                                <div class="form_desc">Оставьте свой номер телефона, наш менеджер перезвонит Вам и сам оформит заказ.</div>
+                                <div class="form_label"><label for="consult_phone" class="required">Телефон* <span>(обязательно)</span></label></div>
+                                <div class="form_input"><input id="consult_phone" class="required" name="order_phone" type="text" value="" placeholder="8-XXX-XXX-XX-XX"></div>
+                                <div class="form_submit"><a id="fastbuySubmit" href="javascript:void(0);" onclick="yaCounter6517690.reachGoal(\'otpravit-kup-odin\'); return true;" ><img src="'.base_path().path_to_theme().'/img/form_submit.png" alt=""></a></div>
+                            </div>
+                        </div>
+                        <div class="element_fastbuy_button" id="elementFastbuyButton" onclick="yaCounter6517690.reachGoal(\'kupit-odin-klik\'); return true;" ><img src="'.base_path().path_to_theme().'/img/element_fastbuy_button.png" alt=""></div>
+                        <div class="clear"></div>
+                    </div>
+                    <!--<a href="#order" class="element_detail_order" id="elementOrder"><img src="'.base_path().path_to_theme().'/img/element_order.png" alt=""></a>-->
+                    <div style="display:none;">
+                        <div class="form form_order" id="order">
+                            <div class="form_title">ОФОРМИТЬ ЗАКАЗ</div>
+                            <div class="form_desc">Заполните форму. С Вами свяжется наш специалист в ближайшее время и уточнит детали заказа.</div>
+                            <div class="clear"></div>
+                            <div class="form_left">
+                                <div class="form_element_title">'.$node->title.'</div>
+                                <div class="form_element_photo"><img src="'.$node->product_image_alt.'" alt=""></div>
+                                <div class="form_element_url" style="display:none;">http://'.$_SERVER['HTTP_HOST'].$_SERVER['REQUEST_URI'].'</div>
+                                <div class="form_element_desc">
+                                </div>
+                                <div class="form_element_price">
+                                </div>
+                            </div>
+                            <div class="form_right">
+                                <input type="hidden" name="taxonomy_id" value="'.$first_taxonomy_id.'">
+                                <div class="form_label"><label for="order_name">Представьтесь пожалуйста</label></div>
+                                <div class="form_input"><input id="order_name" name="order_name" type="text" value="" placeholder="Например, Светлана"></div>
+                                <div class="form_label"><label for="order_phone" class="required">Телефон* <span>(обязательно)</span></label></div>
+                                <div class="form_input"><input id="order_phone" class="required" name="order_phone" type="text" value="" placeholder="8-XXX-XXX-XX-XX"></div>
+                                <div class="form_label"><label for="order_email">E-mail</label></div>
+                                <div class="form_input"><input id="order_email" name="order_email" type="text" value="" placeholder="xxxxx@xxx.xx"></div>
+                                <div class="form_desc">На Вашу почту будет выслано финальное подтверждение и счёт для оплаты. Заказ считается негарантированным до подтверждения заявки менеджером фирмы. Если в ближайшее время подтверждение не будет получено, свяжитесь с нами напрямую</div>
+                                <div class="form_submit"><a id="orderSubmit" href="javascript:void(0);" onclick="yaCounter6517690.reachGoal(\'otpravit-of-zakaz\'); return true;" ><img src="'.base_path().path_to_theme().'/img/form_submit.png" alt=""></a></div>
+                            </div>
+                            <div class="clear"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div style="clear:right;"></div>
+            ';
+            $node->content['title'] = array (
+                '#value' => $left.$right,
+                '#weight' => 5,
+            );
+            // $body = array_shift($node->content);
+            $node->content['body']['#weight'] = 10;
+            $node->content['body']['#value'] = '<div class="element_detail_text">'.$node->content['body']['#value'];
+            
+            $output = '<table class="product-prices"><tr><th>Описание</th><th class="price-cell">Цена</th></tr>';
+            $rs = db_query("SELECT * FROM {product} WHERE `nid`=%d ", $node->nid);
+            $counter = 0;
+            // $output .= '<span style="color:red">цену можно уточнить у менеджера</span>';
+            while ($row = db_fetch_object($rs)) {
+                //$output .= '<tr class="'. ((++$counter % 2) ? 'odd' : 'even')  .'">';
+                $output .= '<tr>';
+                $output .= '<td class="left">'. $row->description .'</td>';
+                $output .= '<td class="right"><div class="price">'. $row->price .'</div><a href="#order" class="element_detail_order" onclick="yaCounter6517690.reachGoal(\'oformit-zakaz\'); return true;" ><img src="'.base_path().path_to_theme().'/img/element_order.png" alt="" width="160"></a><button class="order-button" pid="'. $row->pid .'"></a></button>';
+                // $output .= l('Изменить', $row->pid, array('attributes' => array('class' => 'edit-link')));
+                // $output .= l('Удалить', $row->pid, array('attributes' => array('class' => 'del-link')));
+                $output .= '</td>';
+                $output .= '</tr>';
+            }
+            $output .= '</table>';
+            
+            preg_match('%^полимергранит/№([\d]{1,2})%s', $node->path, $matches);
+            $str = $matches[1];
+            if($str>1 && $str<65)
+                $output .= '<div><p style="text-align: left;font-size: 18px;line-height: 1.3;">Установка не входит в стоимость памятника, оплачивается отдельно, <br>согласно прайсу по установке памятников.</p></div>';
+                
+            // $node->content['prices'] = array (
+            //     '#value' => $output,
+            //     '#weight' => 15,
+            // );
+
+            $node->content['body']['#value'].= $output;
+            $node->content['body']['#value'].= '</div>';
+            // echo "<pre>";
+            // print_r($node);
+            
+            // array_push($node->content, $body);
+            // die('<pre>'.print_r($node->content, true).'</pre>');
+            break;
+    }
+}
+
+function product_form_alter(&$form, &$form_state, $form_id) {
+    if ($form_id == 'product_node_form') {
+        unset($form['image_attach']['iids'], $form['image_attach']['image_title']);
+//        /die('<pre>'.print_r($form, true).'</pre>');
+
+        $form['product_fieldset'] = array (
+            '#attributes' => array (
+                'id' => 'product-form',
+            ),
+            '#type' => 'fieldset',
+            '#title' => 'Цены',
+            '#description' => 'Список цен с кратким описанием',
+            'product_create_fieldset' => array (
+                '#type' => 'fieldset',
+                'description' => array (
+                    '#type' => 'textarea',
+                    '#rows' => 4,
+                    '#id' => 'product_description',
+                    '#name' => 'product_description',
+                    '#title' => 'Описание к цене',
+                ),
+                'teaser' => array (
+                    '#type' => 'textfield',
+                    '#id' => 'product_teaser',
+                    '#name' => 'product_teaser',
+                    '#title' => 'Краткое описание',
+                ),
+                'price' => array (
+                    '#type' => 'textfield',
+                    '#id' => 'product_price',
+                    '#name' => 'product_price',
+                    '#title' => 'Цена',
+                ),
+                'pid' => array (
+                    '#type' => 'hidden',
+                    '#id' => 'product_pid',
+                    '#name' => 'product_pid',
+                ),
+                'add_button' => array (
+                    '#id' => 'add-product-button',
+                    '#type' => 'button',
+                    '#value' => 'Добавить',
+                ),
+                'update_button' => array (
+                    '#id' => 'update-product-button',
+                    '#type' => 'button',
+                    '#value' => 'Сохранить',
+                ),
+                'node_id' => array (
+                    /*'#attributes' => array (
+                        'id' => 'node_id',
+                    ),*/
+                    '#name'  => 'product_node_id',
+                    '#type'  => 'hidden',
+                    '#value' => $form['nid']['#value'],
+                ),
+            ),
+            'product-fieldset' => array (
+                '#attributes' => array (
+                    'id' => 'product-fieldset',
+                ),
+                '#type'  => 'fieldset',
+            ),
+        );
+    }
+}
+
+function product_block($op = 'list', $delta = 0, $edit = array()) {
+    switch ($op) {
+        case 'list':
+            return array (
+                0 => array ('info' => 'Меню сайта'),
+                //1 => array ('info' => 'Выбор телефонов города'),
+            );
+            break;
+        case 'view':
+            switch ($delta) {
+                case 0:
+                    return array ('content' => theme('product_menu_block'));
+                    break;
+                /*case 1:
+                    return array ('content' => draw_phone_select());
+                    break;*/
+            }
+            break;
+    }
+}
+
+function product_theme() {
+    return array (
+        'product_menu_block' => array ('template' => 'tpl/menu-block'),
+        'product_group_page' => array (
+            'template' => 'tpl/group-page',
+            'arguments' => array (
+                'tid' => NULL,
+            ),
+        ),
+    );
+}
+
+function product_add_node_products() {
+    if (isset($_POST['product_price']) && $_POST['product_price'] > 0) {
+        db_query(
+            "INSERT INTO {product} (`nid`,`teaser`,`description`,`price`) VALUES(%d,'%s','%s','%s')",
+            $_POST['product_node_id'], $_POST['product_teaser'], $_POST['product_description'], $_POST['product_price']
+        );
+    }
+    product_get_node_products($_POST['product_node_id']);
+}
+
+function product_update_data() {
+    //die('<pre>'.print_r($_POST, true).'</pre>');
+    if (isset($_POST['product_pid']) && isset($_POST['product_price'])) {
+        db_query(
+            "UPDATE {product} SET `teaser`='%s',`description`='%s',`price`=%d WHERE `pid`=%d",
+            $_POST['product_teaser'], $_POST['product_description'], intval($_POST['product_price']), $_POST['product_pid']
+        );
+    }
+    product_get_node_products($_POST['product_node_id']);
+}
+
+function product_get_node_products($nid) {
+    $output = '<table><tr><th>Описание</th><th>Краткое описание</th><th class="price-cell">Цена</th><th class="action-cell"></th><th class="action-cell"></th></tr>';
+    $rs = db_query("SELECT * FROM {product} WHERE `nid`=%d ", $nid);
+    $counter = 0;
+    while ($row = db_fetch_object($rs)) {
+        $output .= '<tr class="'. ((++$counter % 2) ? 'odd' : 'even')  .'">';
+        $output .= '<td>'. $row->description .'</td>';
+        $output .= '<td>'. $row->teaser .'</td>';
+        $output .= '<td>'. $row->price .'</td>';
+        $output .= '<td>'. l('Изменить', $row->pid, array('attributes' => array('class' => 'edit-link'))) .'</td>';
+        $output .= '<td>'. l('Удалить', $row->pid, array('attributes' => array('class' => 'del-link'))) .'</td>';
+        $output .= '</tr>';
+    }
+    $output .= '</table>';
+    die($output);
+}
+
+function product_get_by_pid($pid) {
+    $product = db_fetch_array(db_query("SELECT * FROM {product} WHERE `pid`=%d ", $pid));
+    // die(drupal_to_js($product));
+    die(json_encode($product));
+}
+
+function product_del_node_products($pid) {
+    if ($pid) {
+        db_query("DELETE FROM {product} WHERE `pid`=%d", $pid);
+    }
+    product_get_node_products($_POST['product_node_id']);
+}
+
+function product_node_view($nid) {
+    $node = node_load($nid);
+    die('<pre>'.print_r($form, true).'</pre>');
+}
+
+function product_group_view($tid) {
+
+    
+}
+
+function template_preprocess_product_group_page(&$vars) {
+    $term = db_fetch_object(db_query("SELECT * FROM {term_data} WHERE `tid`=%d", $vars['tid']));
+    $vars['title'] = $term->name;
+    $vars['description'] = $term->description;
+    drupal_set_title($term->name);
+    
+    $sql = sprintf("SELECT `nid` FROM {term_node} WHERE `tid`=%d", $vars['tid']);
+    $cnt = sprintf("SELECT COUNT(*) FROM {term_node} WHERE `tid`=%d", $vars['tid']);
+    $rs = pager_query($sql, 20, 0, $cnt);
+    while ($nid = db_result($rs)) {
+        $node = node_load($nid);
+        $vars['products'] .= node_view($node, true, false);
+    }
+    $vars['pager'] = theme_pager($rs, 20, 0, array(), 5);
+}
+
+
+function img($src, $_attrs = array()) {
+    $attrs = array();
+    foreach ($_attrs as $name => $value) {
+        $attrs[] = $name . ' = "'. $value . '"';
+    }
+    return sprintf('<img src="%s" %s />', url($src), implode(' ', $attrs));
+}
+//-----
