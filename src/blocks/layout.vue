@@ -1,7 +1,7 @@
 <template>
   <div :class="$style.root">
     <page-header
-      title="Page header"
+      title="Page header !!!"
       :class="$style.head"
     />
     <div :class="$style.body">

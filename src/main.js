@@ -13,4 +13,4 @@ const app = createApp({
   i18n,
 })
 
-app.mount('#app')
+app.mount('#content')

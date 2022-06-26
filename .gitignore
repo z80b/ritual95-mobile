@@ -3,6 +3,7 @@
 /.docker/db
 !/src
 !/.*
+.DS_Store
 !/*.json
 !/*.js
 !/*.yaml

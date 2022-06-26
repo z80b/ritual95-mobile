@@ -20,7 +20,7 @@ const port = 3000;
 export default {
   input: 'src/main.js',
   output: {
-    dir: 'public/assets',
+    dir: 'sites/all/modules/ritual95/mobile',
     entryFileNames: 'app.js',
     format: 'iife',
     sourcemap: !production ? 'inline' : false,
@@ -70,14 +70,6 @@ export default {
       visualizer({
         open: false,
       }),
-    !production &&
-      serve({
-        open: true,
-        contentBase: 'public',
-        historyApiFallback: true,
-        port,
-      }),
-    !production && livereload({ watch: 'public' }),
     production && filesize(),
   ],
   watch: {
