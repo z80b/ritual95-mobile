@@ -14,7 +14,7 @@ php:
 	docker run -d --rm --name $(notdir $(CURDIR))_php \
 	--network $(notdir $(CURDIR))_network \
 	--volume $(CURDIR):/var/www/default/htdocs \
-	devilbox/php-fpm-5.2
+	devilbox/php-fpm:5.2-mods
 
 nginx:
 	docker run -d --rm --name $(notdir $(CURDIR))_nginx \

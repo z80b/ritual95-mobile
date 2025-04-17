@@ -11,7 +11,11 @@ function products_menu() {
   );
 }
 
-function products_node_view($pid) {
-  $nid = db_result(db_query("SELECT `nid` FROM {product} WHERE `pid`=%d", $pid));
-  return node_view(node_load($nid));
+function products_node_view($nid) {
+	$node = node_load(array("nid" => $nid));
+	if ($_GET['json']) {
+		header('Content-Type: application/json; charset=utf-8');
+		die(json_encode($node));
+	}
+	return node_view($node);
 }

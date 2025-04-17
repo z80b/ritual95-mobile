@@ -129,6 +129,11 @@ function phptemplate_preprocess_page(&$vars) {
   } else {
     $title = $vars['title'];
   }
+  $page = isset($_GET['page']) ? intval($_GET[page]) + 1 : '';
+  if ($page) {
+	$title = "$title страница $page";
+  }
+  $vars['head_title'] = "$title | $mainTitle";
   $logo = "/sites/default/files/blogbuzz_logo.png";
   $image = $node->product_image_url ? $node->product_image_alt : $logo;
   $teaser = $node->teaser
@@ -277,7 +282,7 @@ function randomize_on_main() {
         /*
 					<div class="element_price">Цена: ';
 					if ($node->product_minprice && $node->product_minprice > 0)
-            $output .= 'от '.intval($node->product_minprice).' Руб.';
+					    $output .= 'от '.intval($node->product_minprice).' Руб.';
 					$output .= '</div>        
         */
     }

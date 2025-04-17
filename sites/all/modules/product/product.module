@@ -71,6 +71,10 @@ function product_get_nodebyid($nid) {
 }
 
 function product_nodeapi(&$node, $op, $a3 = NULL, $a4 = NULL) {
+    if ($op == 'view' && $_GET['json']) {
+        header('Content-Type: application/json; charset=utf-8');
+        die(json_encode($node));
+    }
     if ($node->type == 'product') switch ($op) {
         case 'insert':
         case 'update':
@@ -441,11 +445,20 @@ function template_preprocess_product_group_page(&$vars) {
     $term = db_fetch_object(db_query("SELECT * FROM {term_data} WHERE `tid`=%d", $vars['tid']));
     $vars['title'] = $term->name;
     $vars['description'] = $term->description;
-    drupal_set_title($term->name);
     
     $sql = sprintf("SELECT `nid` FROM {term_node} WHERE `tid`=%d", $vars['tid']);
     $cnt = sprintf("SELECT COUNT(*) FROM {term_node} WHERE `tid`=%d", $vars['tid']);
     $rs = pager_query($sql, 20, 0, $cnt);
+    if ($_GET['json']) {
+        $vars['products_count'] = db_result(db_query($cnt));
+        $vars['products'] = array();
+        while ($nid = db_result($rs)) {
+            $vars['products'][] = node_load($nid);
+        }
+		header('Content-Type: application/json; charset=utf-8');
+		die(json_encode($vars));       
+    }
+    drupal_set_title($term->name);
     while ($nid = db_result($rs)) {
         $node = node_load($nid);
         $vars['products'] .= node_view($node, true, false);

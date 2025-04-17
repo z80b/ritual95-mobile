@@ -12,6 +12,8 @@
         <div class="element_price">
             <?if (!$node->product_minprice && !$node->product_maxprice):?>
             <span style="color:red">цену можно уточнить у менеджера</span>
+			<?elseif ($node->taxonomy[2]->tid == 2):?>
+			&nbsp;
             <?else:?>
                 <?if($node->product_minprice && $node->product_maxprice && $node->product_minprice!=$node->product_maxprice):?>
                     Цена: от <?php print intval($node->product_minprice)?> Руб.
